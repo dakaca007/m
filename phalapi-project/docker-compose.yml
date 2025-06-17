@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   app:
     build:
-      context: ./docker
+      context: .
       dockerfile: Dockerfile
     volumes:
       - ./src:/var/www/html/src
@@ -11,6 +9,8 @@ services:
       - ./config:/var/www/html/config
     networks:
       - phalapi-network
+
+ 
 
   nginx:
     image: nginx:latest
@@ -21,6 +21,8 @@ services:
       - "80:80"
     networks:
       - phalapi-network
+
+  
 
 networks:
   phalapi-network:
