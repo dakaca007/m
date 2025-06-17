@@ -16,8 +16,12 @@ WORKDIR /var/www/html
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader
+# 添加自定义 PHP-FPM 配置
+COPY docker/php-fpm/zz-docker.conf /usr/local/etc/php-fpm.d/zz-docker.conf
 
+# 确保目录权限
 RUN chown -R www-data:www-data /var/www/html
+
 
 COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
