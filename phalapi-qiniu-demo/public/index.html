@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PhalApi + Qiniu Docker Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        #results div { margin-top: 10px; padding: 10px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>PhalApi + Qiniu Docker Demo</h1>
+    
+    <div class="section">
+        <h2>API 测试</h2>
+        <button id="testApi">测试API连接</button>
+        <div id="apiResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>服务器端上传</h2>
+        <form id="serverUpload">
+            <input type="file" id="serverFile" required>
+            <button type="submit">上传文件</button>
+        </form>
+        <div id="serverResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>客户端直传</h2>
+        <form id="clientUpload">
+            <input type="file" id="clientFile" required>
+            <button type="submit">直传到七牛</button>
+        </form>
+        <div id="clientResult"></div>
+    </div>
+
+    <script>
+    // API测试
+    document.getElementById('testApi').addEventListener('click', async () => {
+        const resultEl = document.getElementById('apiResult');
+        resultEl.innerHTML = '测试中...';
+        
+        try {
+            const response = await fetch('/?s=QiniuDemo.Test');
+            const data = await response.json();
+            
+            if (data.message) {
+                resultEl.innerHTML = `✓ 连接成功: ${data.message}<br>时间戳: ${data.timestamp}`;
+            } else {
+                resultEl.innerHTML = `× 连接失败: ${JSON.stringify(data)}`;
+            }
+        } catch (error) {
+            resultEl.innerHTML = `× 请求失败: ${error.message}`;
+        }
+    });
+
+    // 服务器端上传
+    document.getElementById('serverUpload').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const resultEl = document.getElementById('serverResult');
+        const fileInput = document.getElementById('serverFile');
+        
+        if (!fileInput.files.length) {
+            resultEl.innerHTML = '请选择文件';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        
+        resultEl.innerHTML = '上传中...';
+        
+        try {
+            const response = await fetch('/?s=QiniuDemo.Upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            if (data.url) {
+                resultEl.innerHTML = `✓ 上传成功! <a href="${data.url}" target="_blank">查看文件</a>`;
+            } else {
+                resultEl.innerHTML = `× 上传失败: ${JSON.stringify(data)}`;
+            }
+        } catch (error) {
+            resultEl.innerHTML = `× 请求失败: ${error.message}`;
+        }
+    });
+
+    // 客户端直传
+    document.getElementById('clientUpload').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const resultEl = document.getElementById('clientResult');
+        const fileInput = document.getElementById('clientFile');
+        
+        if (!fileInput.files.length) {
+            resultEl.innerHTML = '请选择文件';
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        resultEl.innerHTML = '获取上传凭证中...';
+        
+        try {
+            // 获取上传凭证
+            const tokenRes = await fetch(`/?s=QiniuDemo.getToken&key=${file.name}`);
+            const tokenData = await tokenRes.json();
+            
+            if (!tokenData.token) {
+                throw new Error('获取上传凭证失败');
+            }
+            
+            // 构建上传表单
+            const formData = new FormData();
+            formData.append('token', tokenData.token);
+            formData.append('key', file.name);
+            formData.append('file', file);
+            
+            // 直传到七牛
+            resultEl.innerHTML = '上传到七牛云中...';
+            const uploadRes = await fetch(tokenData.uploadUrl, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await uploadRes.json();
+            if (result.key) {
+                const domain = tokenData.uploadUrl.includes('up.qiniup.com') 
+                    ? 'https://qiniu.bjyjzx.net' 
+                    : tokenData.uploadUrl.split('/up.')[0];
+                resultEl.innerHTML = `✓ 直传成功! <a href="${domain}/${result.key}" target="_blank">查看文件</a>`;
+            } else {
+                resultEl.innerHTML = `× 上传失败: ${JSON.stringify(result)}`;
+            }
+        } catch (error) {
+            resultEl.innerHTML = `× 请求失败: ${error.message}`;
+        }
+    });
+    </script>
+</body>
+</html>
